@@ -1,4 +1,4 @@
-package com.xiaoyi.test;
+package com.xiaoyi.test1;
 
 import org.junit.jupiter.api.Test;
 

@@ -1,4 +1,4 @@
-package com.xiaoyi.test;
+package com.xiaoyi.test2;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -18,17 +18,14 @@ import java.util.Scanner;
  */
 public class TCPTest02 {
   static final int port = 8080;
-  static String str = "";
 }
 
 /** TCP客户端 */
 class TCPClient02 {
 
-  String over = "666";
-
   public static void main(String[] args) {
     // 发送数据
-    new TCPClient().send("activate.navicat.com");
+    new TCPClient02().send("activate.navicat.com");
   }
 
   /**
@@ -37,10 +34,13 @@ class TCPClient02 {
    * @param url 域名或者ip号
    */
   public void send(String url) {
-    try {
-      Socket socket = new Socket(InetAddress.getByName(url), TCPTest.port);
-      OutputStream outputStream = socket.getOutputStream();
-      while (!over.equals(TCPTest.str)) {
+    while (true) {
+      OutputStream outputStream = null;
+      InputStream inputStream = null;
+      Socket socket = null;
+      try {
+        socket = new Socket(InetAddress.getByName(url), TCPTest02.port);
+        outputStream = socket.getOutputStream();
         System.out.println("请输入您的账号");
         Scanner scanner = new Scanner(System.in);
         String username = scanner.next();
@@ -49,14 +49,27 @@ class TCPClient02 {
         String content = "username=" + username + "&password=" + password;
         outputStream.write(content.getBytes());
         byte[] bytes = new byte[1024];
-        InputStream inputStream = socket.getInputStream();
-        int read = inputStream.read();
-        System.out.println(new String(bytes, 0, read));
+        inputStream = socket.getInputStream();
+        int read = inputStream.read(bytes);
+        String result = new String(bytes, 0, read);
+        if ("ok".equals(result)) {
+          System.out.println("登录成功");
+        } else {
+          System.out.println("登录失败");
+        }
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      } finally {
+        try {
+          assert outputStream != null;
+          outputStream.close();
+          assert inputStream != null;
+          inputStream.close();
+          socket.close();
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
       }
-      outputStream.close();
-      socket.close();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
     }
   }
 }
@@ -64,50 +77,48 @@ class TCPClient02 {
 /** 服务端 */
 class TCPServer02 {
 
-  byte[] bytes = new byte[1024];
-  int count = 0;
-
   public static void main(String[] args) {
     // 接收数据
-    new TCPServer().accept();
+    new TCPServer02().accept();
   }
 
   /** 接收数据 */
   public void accept() {
     ServerSocket serverSocket = null;
-    Socket socket = null;
     try {
-      serverSocket = new ServerSocket(TCPTest.port);
-      socket = serverSocket.accept();
-      while (count != 10000) {
-        Socket finalSocket = socket;
+      serverSocket = new ServerSocket(TCPTest02.port);
+      while (true) {
+        Socket accept = serverSocket.accept();
         new Thread(
                 () -> {
                   InputStream inputStream = null;
+                  OutputStream outputStream = null;
                   try {
-                    inputStream = finalSocket.getInputStream();
-                    while (count != 1000) {
-                      int read = inputStream.read(bytes);
-                      String content = new String(bytes, 0, read);
-                      String username = content.split("&")[0].split("=")[1];
-                      String password = content.split("&")[1].split("=")[1];
-                      OutputStream outputStream = finalSocket.getOutputStream();
-                      if ("zhangsan".equals(username) && "123456".equals(password)) {
-                        outputStream.write("ok".getBytes());
-                      } else {
-                        outputStream.write("fail".getBytes());
-                      }
-                      outputStream.close();
-                      count++;
+                    inputStream = accept.getInputStream();
+                    byte[] bytes = new byte[1024];
+                    int read = inputStream.read(bytes);
+                    String content = new String(bytes, 0, read);
+                    String username = content.split("&")[0].split("=")[1];
+                    String password = content.split("&")[1].split("=")[1];
+                    outputStream = accept.getOutputStream();
+                    if ("zhangsan".equals(username) && "123456".equals(password)) {
+                      outputStream.write("ok".getBytes());
+                    } else {
+                      outputStream.write("fail".getBytes());
                     }
                   } catch (IOException e) {
                     throw new RuntimeException(e);
                   } finally {
                     try {
-                      assert inputStream != null;
-                      inputStream.close();
-                    } catch (IOException e) {
-                      e.printStackTrace();
+                      if (inputStream != null) {
+                        inputStream.close();
+                      }
+                      if (outputStream != null) {
+                        outputStream.close();
+                      }
+                      accept.close();
+                    } catch (Exception e) {
+                      throw new RuntimeException(e);
                     }
                   }
                 })
@@ -117,14 +128,11 @@ class TCPServer02 {
       throw new RuntimeException(e);
     } finally {
       try {
-        if (socket != null) {
-          socket.close();
-        }
         if (serverSocket != null) {
           serverSocket.close();
         }
       } catch (IOException e) {
-        e.printStackTrace();
+        throw new RuntimeException(e);
       }
     }
   }
